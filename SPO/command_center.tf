@@ -7,7 +7,11 @@
 # Variables
 #############
 locals {
-  my_home_ip = "" #TODO
+  my_home_ip           = file("${path.module}/my_home_ip.txt")
+  relay_instance_type  = "t3a.small"
+  ami_region1_ubuntu20 = "ami-07dd19a7900a1f049"
+  ami_region2_ubuntu20 = "ami-07fbdcfe29326c4fb"
+  ami_region3_ubuntu20 = "ami-0f2dd5fc989207c82"
 }
 
 locals {
@@ -245,9 +249,10 @@ resource "aws_subnet" "region2_private" {
   }
 }
 resource "aws_subnet" "region3_private" {
-  provider   = aws.region3
-  vpc_id     = aws_vpc.region3.id
-  cidr_block = "10.2.0.0/28"
+  provider          = aws.region3
+  availability_zone = "ap-northeast-1a" #TODO
+  vpc_id            = aws_vpc.region3.id
+  cidr_block        = "10.2.0.0/28"
   tags = {
     "SPO" = "region3"
   }
@@ -305,7 +310,7 @@ resource "aws_subnet" "region1_public_monitoring" {
     "node" = "monitoring"
   }
 }
-resource "aws_subnet" "region2_public" {
+resource "aws_subnet" "region2_public_relay" {
   provider                = aws.region2
   vpc_id                  = aws_vpc.region2.id
   cidr_block              = "10.1.1.0/28"
@@ -315,8 +320,9 @@ resource "aws_subnet" "region2_public" {
     "SPO" = "region2"
   }
 }
-resource "aws_subnet" "region3_public" {
+resource "aws_subnet" "region3_public_relay" {
   provider                = aws.region3
+  availability_zone       = "ap-northeast-1a" #TODO
   vpc_id                  = aws_vpc.region3.id
   cidr_block              = "10.2.1.0/28"
   map_public_ip_on_launch = true
@@ -395,21 +401,24 @@ resource "aws_route_table" "rt1" {
     gateway_id = aws_internet_gateway.igw1.id
   }
 
+  # Private Routes to all other VPC Peering regions
+  route {
+    cidr_block                = aws_vpc.region2.cidr_block
+    vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region2.id
+  }
+
+  route {
+    cidr_block                = aws_vpc.region3.cidr_block
+    vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region3.id
+  }
+
   # # Private Routes to all other VPC Peering regions
-  # route {
-  #   cidr_block                = aws_subnet.region1_private.cidr_block
-  #   vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region2.id
-  # }
-  # route {
-  #   cidr_block                = aws_subnet.region1_private.cidr_block
-  #   vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region3.id
-  # }
   # # route {
-  # #   cidr_block                = aws_subnet.region1_private.cidr_block
+  # #   cidr_block                = aws_vpc.region4.cidr_block
   # #   vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region4.id
   # # }
   # # route {
-  # #   cidr_block                = aws_subnet.region1_private.cidr_block
+  # #   cidr_block                = aws_vpc.region5.cidr_block
   # #   vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region5.id
   # # }
 
@@ -444,21 +453,24 @@ resource "aws_route_table" "rt2" {
     gateway_id = aws_internet_gateway.igw2.id
   }
 
+  # Private Routes to all other VPC Peering regions
+  route {
+    cidr_block                = aws_vpc.region1.cidr_block
+    vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region2.id
+  }
+
+  route {
+    cidr_block                = aws_vpc.region3.cidr_block
+    vpc_peering_connection_id = aws_vpc_peering_connection.region2_to_region3.id
+  }
+
   # # Private Routes to all other VPC Peering regions
-  # route {
-  #   cidr_block                = aws_subnet.region2_private.cidr_block
-  #   vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region2.id
-  # }
-  # route {
-  #   cidr_block                = aws_subnet.region2_private.cidr_block
-  #   vpc_peering_connection_id = aws_vpc_peering_connection.region2_to_region3.id
-  # }
   # # route {
-  # #   cidr_block                = aws_subnet.region2_private.cidr_block
+  # #   cidr_block                = aws_vpc.region4.cidr_block
   # #   vpc_peering_connection_id = aws_vpc_peering_connection.region2_to_region4.id
   # # }
   # # route {
-  # #   cidr_block                = aws_subnet.region2_private.cidr_block
+  # #   cidr_block                = aws_vpc.region5.cidr_block
   # #   vpc_peering_connection_id = aws_vpc_peering_connection.region2_to_region5.id
   # # }
 
@@ -468,7 +480,7 @@ resource "aws_route_table" "rt2" {
 }
 resource "aws_route_table_association" "rt2_relay" {
   provider       = aws.region2
-  subnet_id      = aws_subnet.region2_public.id
+  subnet_id      = aws_subnet.region2_public_relay.id
   route_table_id = aws_route_table.rt2.id
 }
 
@@ -483,21 +495,24 @@ resource "aws_route_table" "rt3" {
     gateway_id = aws_internet_gateway.igw3.id
   }
 
+  # Private Routes to all other VPC Peering regions
+  route {
+    cidr_block                = aws_vpc.region1.cidr_block
+    vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region3.id
+  }
+
+  route {
+    cidr_block                = aws_vpc.region2.cidr_block
+    vpc_peering_connection_id = aws_vpc_peering_connection.region2_to_region3.id
+  }
+
   # # Private Routes to all other VPC Peering regions
-  # route {
-  #   cidr_block                = aws_subnet.region3_private.cidr_block
-  #   vpc_peering_connection_id = aws_vpc_peering_connection.region1_to_region3.id
-  # }
-  # route {
-  #   cidr_block                = aws_subnet.region3_private.cidr_block
-  #   vpc_peering_connection_id = aws_vpc_peering_connection.region2_to_region3.id
-  # }
   # # route {
-  # #   cidr_block                = aws_subnet.region3_private.cidr_block
+  # #   cidr_block                = aws_vpc.region4.cidr_block
   # #   vpc_peering_connection_id = aws_vpc_peering_connection.region3_to_region4.id
   # # }
   # # route {
-  # #   cidr_block                = aws_subnet.region3_private.cidr_block
+  # #   cidr_block                = aws_vpc.region5.cidr_block
   # #   vpc_peering_connection_id = aws_vpc_peering_connection.region3_to_region5.id
   # # }
 
@@ -507,7 +522,7 @@ resource "aws_route_table" "rt3" {
 }
 resource "aws_route_table_association" "rt3_relay" {
   provider       = aws.region3
-  subnet_id      = aws_subnet.region3_public.id
+  subnet_id      = aws_subnet.region3_public_relay.id
   route_table_id = aws_route_table.rt3.id
 }
 
@@ -758,7 +773,7 @@ resource "aws_network_acl" "region1_public_relay" {
   vpc_id     = aws_vpc.region1.id
   subnet_ids = [aws_subnet.region1_public_relay.id]
 
-  # ingress rules to only allow incoming connections from anywhere
+  # Cardano public Relay ingress rules from anywhere on port #
   ingress {
     protocol   = "tcp"
     rule_no    = 100
@@ -848,6 +863,196 @@ resource "aws_network_acl" "region1_public_relay" {
     "host" = "ubuntu"
   }
 }
+resource "aws_network_acl" "region2_public_relay" {
+  provider   = aws.region2
+  vpc_id     = aws_vpc.region2.id
+  subnet_ids = [aws_subnet.region2_public_relay.id]
+
+  # Cardano public Relay ingress rules from anywhere on port #
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 6001
+    to_port    = 6001
+  }
+  ingress { # Return Traffic
+    protocol   = "tcp"
+    rule_no    = 200
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 32768
+    to_port    = 65535
+  }
+  ingress { # SSH from bastion
+    protocol   = "tcp"
+    rule_no    = 220
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 22
+    to_port    = 22
+  }
+  ingress { # Prometheus Node Exporter
+    protocol   = "tcp"
+    rule_no    = 410
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 9100
+    to_port    = 9100
+  }
+  ingress { # block everything else
+    protocol   = "all"
+    rule_no    = 999
+    action     = "deny"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  # egress rules to allow ubuntu package updates
+  egress { # DNS
+    protocol   = "tcp"
+    rule_no    = 200
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 53
+    to_port    = 53
+  }
+  egress { # HTTP
+    protocol   = "tcp"
+    rule_no    = 210
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
+  }
+  egress { # HTTPS
+    protocol   = "tcp"
+    rule_no    = 220
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 443
+    to_port    = 443
+  }
+  egress { # SSH return traffic to Bastion TODO
+    protocol   = "tcp"
+    rule_no    = 301
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 0
+    to_port    = 65535
+  }
+  egress { # block everything else
+    protocol   = "all"
+    rule_no    = 999
+    action     = "deny"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = {
+    "SPO"  = "region2"
+    "node" = "relay2"
+    "host" = "ubuntu"
+  }
+}
+resource "aws_network_acl" "region3_public_relay" {
+  provider   = aws.region3
+  vpc_id     = aws_vpc.region3.id
+  subnet_ids = [aws_subnet.region3_public_relay.id]
+
+  # Cardano public Relay ingress rules from anywhere on port #
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 6001
+    to_port    = 6001
+  }
+  ingress { # Return Traffic
+    protocol   = "tcp"
+    rule_no    = 200
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 32768
+    to_port    = 65535
+  }
+  ingress { # SSH from bastion
+    protocol   = "tcp"
+    rule_no    = 220
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 22
+    to_port    = 22
+  }
+  ingress { # Prometheus Node Exporter
+    protocol   = "tcp"
+    rule_no    = 410
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 9100
+    to_port    = 9100
+  }
+  ingress { # block everything else
+    protocol   = "all"
+    rule_no    = 999
+    action     = "deny"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  # egress rules to allow ubuntu package updates
+  egress { # DNS
+    protocol   = "tcp"
+    rule_no    = 200
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 53
+    to_port    = 53
+  }
+  egress { # HTTP
+    protocol   = "tcp"
+    rule_no    = 210
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
+  }
+  egress { # HTTPS
+    protocol   = "tcp"
+    rule_no    = 220
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 443
+    to_port    = 443
+  }
+  egress { # SSH return traffic to Bastion TODO
+    protocol   = "tcp"
+    rule_no    = 301
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 0
+    to_port    = 65535
+  }
+  egress { # block everything else
+    protocol   = "all"
+    rule_no    = 999
+    action     = "deny"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = {
+    "SPO"  = "region3"
+    "node" = "relay3"
+    "host" = "ubuntu"
+  }
+}
 
 resource "aws_network_acl" "region1_private" {
   provider   = aws.region1
@@ -867,7 +1072,7 @@ resource "aws_network_acl" "region1_private" {
   #   protocol   = "tcp"
   #   rule_no    = 100
   #   action     = "allow"
-  #   cidr_block = aws_subnet.region1_private.cidr_block
+  #   cidr_block = aws_vpc.region1.cidr_block
   #   from_port  = 6001
   #   to_port    = 6001
   # }
@@ -970,7 +1175,7 @@ resource "aws_network_acl" "region1_private" {
   #   protocol   = "tcp"
   #   rule_no    = 200
   #   action     = "allow"
-  #   cidr_block = aws_subnet.region4_private.cidr_block
+  #   cidr_block = aws_vpc.region4.cidr_block
   #   from_port  = 22
   #   to_port    = 22
   # }
@@ -978,7 +1183,7 @@ resource "aws_network_acl" "region1_private" {
   #   protocol   = "tcp"
   #   rule_no    = 200
   #   action     = "allow"
-  #   cidr_block = aws_subnet.region5_private.cidr_block
+  #   cidr_block = aws_vpc.region5.cidr_block
   #   from_port  = 22
   #   to_port    = 22
   # }
@@ -1009,7 +1214,7 @@ resource "aws_network_acl" "region2_private" {
     protocol   = "tcp"
     rule_no    = 100
     action     = "allow"
-    cidr_block = aws_subnet.region1_private.cidr_block
+    cidr_block = aws_vpc.region1.cidr_block
     from_port  = 22
     to_port    = 22
   }
@@ -1025,7 +1230,7 @@ resource "aws_network_acl" "region2_private" {
     protocol   = "tcp"
     rule_no    = 120
     action     = "allow"
-    cidr_block = aws_subnet.region1_private.cidr_block
+    cidr_block = aws_vpc.region1.cidr_block
     from_port  = 6001
     to_port    = 6001
   }
@@ -1033,7 +1238,7 @@ resource "aws_network_acl" "region2_private" {
     protocol   = "tcp"
     rule_no    = 130
     action     = "allow"
-    cidr_block = aws_subnet.region3_private.cidr_block
+    cidr_block = aws_vpc.region3.cidr_block
     from_port  = 6001
     to_port    = 6001
   }
@@ -1046,14 +1251,30 @@ resource "aws_network_acl" "region2_private" {
     to_port    = 0
   }
 
-  # Egress return SSH traffic
-  egress {
+  # Egress
+  egress { # return SSH traffic to bastion
     protocol   = "tcp"
     rule_no    = 100
     action     = "allow"
-    cidr_block = aws_subnet.region1_private.cidr_block
+    cidr_block = aws_vpc.region1.cidr_block
     from_port  = 0
     to_port    = 65535
+  }
+  egress { # Cardano Relay to Region1 Private subnet
+    protocol   = "tcp"
+    rule_no    = 220
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 6001
+    to_port    = 6001
+  }
+  egress { # Cardano Relay to Region3 Private subnet
+    protocol   = "tcp"
+    rule_no    = 230
+    action     = "allow"
+    cidr_block = aws_vpc.region3.cidr_block
+    from_port  = 6001
+    to_port    = 6001
   }
   egress { # block everything else
     protocol   = "all"
@@ -1066,7 +1287,7 @@ resource "aws_network_acl" "region2_private" {
 
   tags = {
     "SPO"  = "region2"
-    "node" = "bastion"
+    "node" = "relay2"
     "host" = "ubuntu"
   }
 }
@@ -1082,7 +1303,7 @@ resource "aws_network_acl" "region3_private" {
     protocol   = "tcp"
     rule_no    = 100
     action     = "allow"
-    cidr_block = aws_subnet.region1_private.cidr_block
+    cidr_block = aws_vpc.region1.cidr_block
     from_port  = 22
     to_port    = 22
   }
@@ -1098,7 +1319,7 @@ resource "aws_network_acl" "region3_private" {
     protocol   = "tcp"
     rule_no    = 120
     action     = "allow"
-    cidr_block = aws_subnet.region1_private.cidr_block
+    cidr_block = aws_vpc.region1.cidr_block
     from_port  = 6001
     to_port    = 6001
   }
@@ -1106,7 +1327,7 @@ resource "aws_network_acl" "region3_private" {
     protocol   = "tcp"
     rule_no    = 130
     action     = "allow"
-    cidr_block = aws_subnet.region2_private.cidr_block
+    cidr_block = aws_vpc.region2.cidr_block
     from_port  = 6001
     to_port    = 6001
   }
@@ -1119,14 +1340,30 @@ resource "aws_network_acl" "region3_private" {
     to_port    = 0
   }
 
-  # Egress return SSH traffic
-  egress { # block everything else
+  # Egress
+  egress { # Egress return SSH traffic to bastion
     protocol   = "tcp"
     rule_no    = 100
     action     = "allow"
-    cidr_block = aws_subnet.region1_private.cidr_block
+    cidr_block = aws_vpc.region1.cidr_block
     from_port  = 0
     to_port    = 65535
+  }
+  egress { # Cardano Relay to Region1 Private subnet
+    protocol   = "tcp"
+    rule_no    = 220
+    action     = "allow"
+    cidr_block = aws_vpc.region1.cidr_block
+    from_port  = 6001
+    to_port    = 6001
+  }
+  egress { # Cardano Relay to Region2 Private subnet
+    protocol   = "tcp"
+    rule_no    = 230
+    action     = "allow"
+    cidr_block = aws_vpc.region2.cidr_block
+    from_port  = 6001
+    to_port    = 6001
   }
   egress { # block everything else
     protocol   = "all"
@@ -1139,7 +1376,7 @@ resource "aws_network_acl" "region3_private" {
 
   tags = {
     "SPO"  = "region3"
-    "node" = "bastion"
+    "node" = "relay3"
     "host" = "ubuntu"
   }
 }
@@ -1246,34 +1483,22 @@ resource "aws_security_group" "monitoring" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   egress { # Prometheus Node Exporter
-    from_port  = 9100
-    to_port    = 9100
-    protocol   = "tcp"
-    cidr_blocks = [aws_vpc.region1.cidr_block]
-  }
-  egress { # Prometheus Node Exporter
-    from_port  = 9100
-    to_port    = 9100
-    protocol   = "tcp"
-    cidr_blocks = [aws_vpc.region2.cidr_block]
-  }
-  egress { # Prometheus Node Exporter
-    from_port  = 9100
-    to_port    = 9100
-    protocol   = "tcp"
-    cidr_blocks = [aws_vpc.region3.cidr_block]
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block, aws_vpc.region2.cidr_block, aws_vpc.region3.cidr_block]
   }
 
   tags = {
     "SPO"  = "region1"
-    "node" = "bastion"
+    "node" = "monitoring"
     "host" = "ubuntu"
   }
 }
-resource "aws_security_group" "relay" {
+resource "aws_security_group" "relay1" {
   provider    = aws.region1
-  name        = "SPO Relay"
-  description = "Relay SG"
+  name        = "SPO Relay1"
+  description = "Relay1 SG"
   vpc_id      = aws_vpc.region1.id
 
   # Ingress SSH from Bastion
@@ -1293,10 +1518,10 @@ resource "aws_security_group" "relay" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   # Prometheus Node Exporter
-  ingress { 
-    from_port  = 9100
-    to_port    = 9100
-    protocol   = "tcp"
+  ingress {
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
     cidr_blocks = [aws_vpc.region1.cidr_block]
   }
 
@@ -1320,9 +1545,148 @@ resource "aws_security_group" "relay" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Egress to my other SPO Relays
+  egress {
+    description = "my other Cardano relays"
+    from_port   = 6001
+    to_port     = 6001
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region2.cidr_block, aws_vpc.region3.cidr_block]
+  }
+
   tags = {
     "SPO"  = "region1"
-    "node" = "relay"
+    "node" = "relay1"
+    "host" = "ubuntu"
+  }
+}
+resource "aws_security_group" "relay2" {
+  provider    = aws.region2
+  name        = "SPO Relay2"
+  description = "Relay2 SG"
+  vpc_id      = aws_vpc.region2.id
+
+  # Ingress SSH from Bastion
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block]
+  }
+
+  # Ingress from anywhere for Cardano
+  ingress {
+    description = "Cardano from anywhere"
+    from_port   = 6001
+    to_port     = 6001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  # Prometheus Node Exporter
+  ingress {
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block]
+  }
+
+  # Egress rules for Ubuntu package updates
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Egress to my other SPO Relays
+  egress {
+    description = "my other Cardano relays"
+    from_port   = 6001
+    to_port     = 6001
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block, aws_vpc.region3.cidr_block]
+  }
+
+  tags = {
+    "SPO"  = "region2"
+    "node" = "relay2"
+    "host" = "ubuntu"
+  }
+}
+resource "aws_security_group" "relay3" {
+  provider    = aws.region3
+  name        = "SPO Relay3"
+  description = "Relay3 SG"
+  vpc_id      = aws_vpc.region3.id
+
+  # Ingress SSH from Bastion
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block]
+  }
+
+  # Ingress from anywhere for Cardano
+  ingress {
+    description = "Cardano from anywhere"
+    from_port   = 6001
+    to_port     = 6001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  # Prometheus Node Exporter
+  ingress {
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block]
+  }
+
+  # Egress rules for Ubuntu package updates
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Egress to my other SPO Relays
+  egress {
+    description = "my other Cardano relays"
+    from_port   = 6001
+    to_port     = 6001
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.region1.cidr_block, aws_vpc.region2.cidr_block]
+  }
+
+  tags = {
+    "SPO"  = "region3"
+    "node" = "relay3"
     "host" = "ubuntu"
   }
 }
@@ -1334,10 +1698,20 @@ resource "aws_security_group" "relay" {
 #############
 # Create SSH Key Pair
 #############
-resource "aws_key_pair" "deployer" {
+resource "aws_key_pair" "deployer1" {
   provider   = aws.region1
   key_name   = "SPO-bastion-key"
-  public_key = "" #TODO
+  public_key = file("${path.module}/public_key.txt")
+}
+resource "aws_key_pair" "deployer2" {
+  provider   = aws.region2
+  key_name   = "SPO-bastion-key"
+  public_key = file("${path.module}/public_key.txt")
+}
+resource "aws_key_pair" "deployer3" {
+  provider   = aws.region3
+  key_name   = "SPO-bastion-key"
+  public_key = file("${path.module}/public_key.txt")
 }
 
 #############
@@ -1345,8 +1719,7 @@ resource "aws_key_pair" "deployer" {
 #############
 resource "aws_instance" "bastion" {
   provider = aws.region1
-  ami      = "ami-07dd19a7900a1f049" # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
-  # ami           = "ami-0e472933a1395e172" # Amazon Linux 2 AMI (HVM), SSD Volume Type
+  ami      = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
   instance_type = "t3a.small"
   key_name      = "SPO-bastion-key"
 
@@ -1379,8 +1752,7 @@ resource "aws_eip" "bastion" {
 #############
 resource "aws_instance" "monitoring" {
   provider = aws.region1
-  ami      = "ami-07dd19a7900a1f049" # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
-  # ami           = "ami-0e472933a1395e172" # Amazon Linux 2 AMI (HVM), SSD Volume Type
+  ami      = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
   instance_type = "t3a.small"
   key_name      = "SPO-bastion-key"
 
@@ -1411,38 +1783,96 @@ resource "aws_eip" "monitoring" {
 #############
 # Create Relay Node EC2 Instances and Elastic IPs (Public)
 #############
-resource "aws_instance" "relay" {
+resource "aws_instance" "relay1" {
   provider = aws.region1
-  ami      = "ami-07dd19a7900a1f049" # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
-  # ami           = "ami-0e472933a1395e172" # Amazon Linux 2 AMI (HVM), SSD Volume Type
-  instance_type = "t3a.small"
+  ami      = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  instance_type = local.relay_instance_type
   key_name      = "SPO-bastion-key"
 
   subnet_id              = aws_subnet.region1_public_relay.id
-  vpc_security_group_ids = [aws_security_group.relay.id]
+  vpc_security_group_ids = [aws_security_group.relay1.id]
 
   tags = {
     "SPO"  = "region1"
-    "node" = "relay"
+    "node" = "relay1"
     "host" = "ubuntu"
   }
 }
-resource "aws_eip" "relay" {
+resource "aws_eip" "relay1" {
   provider = aws.region1
   vpc      = true
 
-  instance   = aws_instance.relay.id
+  instance   = aws_instance.relay1.id
   depends_on = [aws_internet_gateway.igw1]
 
   tags = {
-    Name   = "Relay"
+    Name   = "Relay1"
     "SPO"  = "region1"
-    "node" = "relay"
+    "node" = "relay1"
     "host" = "ubuntu"
   }
 }
 
+resource "aws_instance" "relay2" {
+  provider = aws.region2
+  ami      = local.ami_region2_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  instance_type = local.relay_instance_type
+  key_name      = "SPO-bastion-key"
 
+  subnet_id              = aws_subnet.region2_public_relay.id
+  vpc_security_group_ids = [aws_security_group.relay2.id]
+
+  tags = {
+    "SPO"  = "region2"
+    "node" = "relay2"
+    "host" = "ubuntu"
+  }
+}
+resource "aws_eip" "relay2" {
+  provider = aws.region2
+  vpc      = true
+
+  instance   = aws_instance.relay2.id
+  depends_on = [aws_internet_gateway.igw2]
+
+  tags = {
+    Name   = "Relay2"
+    "SPO"  = "region2"
+    "node" = "relay2"
+    "host" = "ubuntu"
+  }
+}
+
+resource "aws_instance" "relay3" {
+  provider          = aws.region3
+  availability_zone = "ap-northeast-1a"          #TODO
+  ami               = local.ami_region3_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  instance_type = local.relay_instance_type
+  key_name      = "SPO-bastion-key"
+
+  subnet_id              = aws_subnet.region3_public_relay.id
+  vpc_security_group_ids = [aws_security_group.relay3.id]
+
+  tags = {
+    "SPO"  = "region3"
+    "node" = "relay3"
+    "host" = "ubuntu"
+  }
+}
+resource "aws_eip" "relay3" {
+  provider = aws.region3
+  vpc      = true
+
+  instance   = aws_instance.relay3.id
+  depends_on = [aws_internet_gateway.igw3]
+
+  tags = {
+    Name   = "Relay3"
+    "SPO"  = "region3"
+    "node" = "relay3"
+    "host" = "ubuntu"
+  }
+}
 
 
 #############
@@ -1465,6 +1895,12 @@ resource "aws_eip" "relay" {
 # Create S3 Bucket for EBS Snapshots
 #############
 
+
+
+
+
+
+
 ################################################################
 #                             Outputs                          #
 ################################################################
@@ -1474,18 +1910,33 @@ output "bastion_public_ip" {
 output "bastion_private_ip" {
   value = aws_instance.bastion.private_ip
 }
+
 output "monitoring_public_ip" {
   value = aws_eip.monitoring.public_ip
 }
 output "monitoring_private_ip" {
   value = aws_instance.monitoring.private_ip
 }
-output "relay_public_ip" {
-  value = aws_eip.relay.public_ip
+
+output "relay1_public_ip" {
+  value = aws_eip.relay1.public_ip
 }
-output "relay_private_ip" {
-  value = aws_instance.relay.private_ip
+output "relay1_private_ip" {
+  value = aws_instance.relay1.private_ip
 }
+output "relay2_public_ip" {
+  value = aws_eip.relay2.public_ip
+}
+output "relay2_private_ip" {
+  value = aws_instance.relay2.private_ip
+}
+output "relay3_public_ip" {
+  value = aws_eip.relay3.public_ip
+}
+output "relay3_private_ip" {
+  value = aws_instance.relay3.private_ip
+}
+
 output "prometheus_url" {
   value = "${aws_eip.monitoring.public_ip}:9090"
 }
