@@ -7,7 +7,7 @@
 # Variables
 #############
 locals {
-  my_home_ip           = file("${path.module}/my_home_ip.txt")
+  my_home_ip           = file("${path.module}/lookups/my_home_ip.txt")
   relay_instance_type  = "t3a.small"
   ami_region1_ubuntu20 = "ami-07dd19a7900a1f049"
   ami_region2_ubuntu20 = "ami-07fbdcfe29326c4fb"
@@ -1701,17 +1701,17 @@ resource "aws_security_group" "relay3" {
 resource "aws_key_pair" "deployer1" {
   provider   = aws.region1
   key_name   = "SPO-bastion-key"
-  public_key = file("${path.module}/public_key.txt")
+  public_key = file("${path.module}/lookups/public_key.txt")
 }
 resource "aws_key_pair" "deployer2" {
   provider   = aws.region2
   key_name   = "SPO-bastion-key"
-  public_key = file("${path.module}/public_key.txt")
+  public_key = file("${path.module}/lookups/public_key.txt")
 }
 resource "aws_key_pair" "deployer3" {
   provider   = aws.region3
   key_name   = "SPO-bastion-key"
-  public_key = file("${path.module}/public_key.txt")
+  public_key = file("${path.module}/lookups/public_key.txt")
 }
 
 #############

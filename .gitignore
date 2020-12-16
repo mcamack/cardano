@@ -29,5 +29,5 @@ override.tf.json
 # example: *tfplan*
 SPO/.terraform.lock.hcl
 docs/
-SPO/my_home_ip.txt
-SPO/public_key.txt
+SPO/lookups/my_home_ip.txt
+SPO/lookups/public_key.txt
