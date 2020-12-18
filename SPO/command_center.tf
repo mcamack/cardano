@@ -1718,8 +1718,8 @@ resource "aws_key_pair" "deployer3" {
 # Create Bastion EC2 Instance (Public)
 #############
 resource "aws_instance" "bastion" {
-  provider = aws.region1
-  ami      = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  provider      = aws.region1
+  ami           = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
   instance_type = "t3a.small"
   key_name      = "SPO-bastion-key"
 
@@ -1751,13 +1751,15 @@ resource "aws_eip" "bastion" {
 # Create Monitoring/Ansible EC2 Instance (Public)
 #############
 resource "aws_instance" "monitoring" {
-  provider = aws.region1
-  ami      = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  provider      = aws.region1
+  ami           = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
   instance_type = "t3a.small"
   key_name      = "SPO-bastion-key"
 
   subnet_id              = aws_subnet.region1_public_monitoring.id
   vpc_security_group_ids = [aws_security_group.monitoring.id]
+
+  depends_on = [aws_instance.relay1, aws_instance.relay2, aws_instance.relay3]
 
   tags = {
     "SPO"  = "region1"
@@ -1784,8 +1786,8 @@ resource "aws_eip" "monitoring" {
 # Create Relay Node EC2 Instances and Elastic IPs (Public)
 #############
 resource "aws_instance" "relay1" {
-  provider = aws.region1
-  ami      = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  provider      = aws.region1
+  ami           = local.ami_region1_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
   instance_type = local.relay_instance_type
   key_name      = "SPO-bastion-key"
 
@@ -1814,8 +1816,8 @@ resource "aws_eip" "relay1" {
 }
 
 resource "aws_instance" "relay2" {
-  provider = aws.region2
-  ami      = local.ami_region2_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+  provider      = aws.region2
+  ami           = local.ami_region2_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
   instance_type = local.relay_instance_type
   key_name      = "SPO-bastion-key"
 
@@ -1847,8 +1849,8 @@ resource "aws_instance" "relay3" {
   provider          = aws.region3
   availability_zone = "ap-northeast-1a"          #TODO
   ami               = local.ami_region3_ubuntu20 # Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
-  instance_type = local.relay_instance_type
-  key_name      = "SPO-bastion-key"
+  instance_type     = local.relay_instance_type
+  key_name          = "SPO-bastion-key"
 
   subnet_id              = aws_subnet.region3_public_relay.id
   vpc_security_group_ids = [aws_security_group.relay3.id]
@@ -1947,4 +1949,82 @@ output "prometheus_url" {
 # 
 # https://www.redhat.com/sysadmin/harden-new-system-ansible
 # Install Prometheus-node-exporter on all nodes
-# Install Docker
+## Install Docker
+
+
+# Create Ansible Hosts File
+resource "local_file" "hosts_cfg" {
+  content = templatefile("${path.module}/templates/hosts.tpl",
+    {
+      bastion    = aws_instance.bastion.public_ip
+      monitoring = aws_instance.monitoring.private_ip
+      relay1     = aws_instance.relay1.private_ip
+      relay2     = aws_instance.relay2.private_ip
+      relay3     = aws_instance.relay3.private_ip
+    }
+  )
+  filename = "./ansible/inventory/hosts.cfg"
+
+  provisioner "local-exec" {
+    command = "ansible-playbook ansible/push_ssh_key_to_bastion.yaml -i ansible/inventory/hosts.cfg"
+  }
+
+  depends_on = [aws_eip.bastion, aws_instance.bastion, aws_instance.monitoring, aws_instance.relay1, aws_instance.relay2, aws_instance.relay3]
+}
+
+# Run Ansible locally
+# provisioner "local-exec" {
+#   command    = "ansible-playbook ansible/push_ssh_key_to_bastion.yaml -i ansible/inventory/hosts.cfg"
+#   depends_on = [aws_instance.bastion]
+# }
+
+
+# Install Ansible on Bastion
+# connection {
+#   type        = "ssh"
+#   user        = "ubuntu"
+#   private_key = file("${path.module}/lookups/private_key_path.txt")
+#   host        = self.public_ip
+# }
+
+# provisioner "remote-exec" {
+#   connection {
+#     type        = "ssh"
+#     user        = "ubuntu"
+#     private_key = file("${path.module}/lookups/private_key_path.txt")
+#     host        = aws_eip.bastion.public_ip
+#   }
+
+#   inline = [
+#     "sudo apt update",
+#     "sudo apt install software-properties-common",
+#     "sudo apt-add-repository --yes --update ppa:ansible/ansible",
+#     "sudo apt install ansible",
+#   ]
+# }
+
+# # Copy SSH Key to Bastion to login to other nodes privately
+# provisioner "file" {
+#   connection {
+#     type        = "ssh"
+#     user        = "ubuntu"
+#     private_key = file("${path.module}/lookups/private_key_path.txt")
+#     host        = self.public_ip
+#   }
+
+#   source      = "~/.ssh/spokey.pem"
+#   destination = "/home/ubuntu"
+# }
+
+# # Copy Setup files to Bastion
+# provisioner "file" {
+#   connection {
+#     type        = "ssh"
+#     user        = "ubuntu"
+#     private_key = file("${path.module}/lookups/private_key_path.txt")
+#     host        = self.public_ip
+#   }
+
+#   source      = "./scripts"
+#   destination = "/tmp"
+# }

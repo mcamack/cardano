@@ -29,5 +29,5 @@ override.tf.json
 # example: *tfplan*
 SPO/.terraform.lock.hcl
 docs/
-SPO/lookups/my_home_ip.txt
-SPO/lookups/public_key.txt
+SPO/lookups/*
+SPO/ansible/inventory/hosts.cfg

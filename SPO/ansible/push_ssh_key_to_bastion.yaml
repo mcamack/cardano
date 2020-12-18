@@ -1,0 +1,53 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
+  tasks:
+    - name: For each host, scan for its ssh public key
+      shell: "ssh-keyscan {{ groups['bastion'][0] }}"
+      register: ssh_known_host_bastion_results
+      ignore_errors: yes
+
+    - name: Add/update the public key in the '{{ ssh_known_hosts_file }}'
+      known_hosts:
+        name: "{{ groups['bastion'][0] }}"
+        key: "{{ ssh_known_host_bastion_results.stdout }}"
+        path: "{{ ssh_known_hosts_file }}"
+
+- hosts: bastion
+  remote_user: ubuntu
+  gather_facts: false
+  vars:
+    ssh_key: '~/.ssh/spokey.pem'
+    ansible_ssh_private_key_file: ~/.ssh/spokey.pem
+  tasks:
+    - name: SSH keys
+      copy:
+        src: "{{ ssh_key }}"
+        dest: /home/ubuntu/.ssh/
+        owner: ubuntu
+        group: ubuntu
+        mode: 0400
+    - name: For each host, scan for its ssh public key
+      shell: "ssh-keyscan {{ item }}"
+      register: ssh_known_host_relay_results
+      ignore_errors: yes
+      with_items: "{{ groups['relays'] }}"
+    - name: Add/update the public key in the '{{ ssh_known_hosts_file }}'
+      known_hosts:
+        name: "{{ item.item }}"
+        key: "{{ item.stdout }}"
+        path: "/home/ubuntu/.ssh/known_hosts"
+      with_items: "{{ ssh_known_host_relay_results.results }}"
+
+- hosts: relays
+  remote_user: ubuntu
+  gather_facts: false
+  vars:
+    ansible_ssh_private_key_file: ~/.ssh/spokey.pem
+  become: true
+  tasks:
+    - name: test
+      shell: apt update
