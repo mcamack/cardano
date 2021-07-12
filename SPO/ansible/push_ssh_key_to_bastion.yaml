@@ -5,12 +5,12 @@
   vars:
     ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
   tasks:
-    - name: For each host, scan for its ssh public key
+    - name: Scan for Bastion public key
       shell: "ssh-keyscan {{ groups['bastion'][0] }}"
       register: ssh_known_host_bastion_results
       ignore_errors: yes
 
-    - name: Add/update the public key in the '{{ ssh_known_hosts_file }}'
+    - name: Add/update Bastion public key in '{{ ssh_known_hosts_file }}'
       known_hosts:
         name: "{{ groups['bastion'][0] }}"
         key: "{{ ssh_known_host_bastion_results.stdout }}"
@@ -20,22 +20,36 @@
   remote_user: ubuntu
   gather_facts: false
   vars:
-    ssh_key: '~/.ssh/spokey.pem'
+    ssh_key: "~/.ssh/spokey.pem"
     ansible_ssh_private_key_file: ~/.ssh/spokey.pem
+  handlers:
+    - name: restart_ssh
+      service:
+        name: ssh
+        state: restarted
+        enabled: true
+      when: ansible_distribution == 'Debian'
   tasks:
-    - name: SSH keys
+    - name: Enabling ssh-key only root access
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin without-password"
+      notify:
+        - restart_ssh
+    - name: Copy SSH key to Bastion
       copy:
         src: "{{ ssh_key }}"
         dest: /home/ubuntu/.ssh/
         owner: ubuntu
         group: ubuntu
         mode: 0400
-    - name: For each host, scan for its ssh public key
+    - name: For each private node, scan for its ssh public key
       shell: "ssh-keyscan {{ item }}"
       register: ssh_known_host_relay_results
       ignore_errors: yes
       with_items: "{{ groups['relays'] }}"
-    - name: Add/update the public key in the '{{ ssh_known_hosts_file }}'
+    - name: Add/update the private node public keys in the Bastion's '{{ ssh_known_hosts_file }}'
       known_hosts:
         name: "{{ item.item }}"
         key: "{{ item.stdout }}"
@@ -48,6 +62,18 @@
   vars:
     ansible_ssh_private_key_file: ~/.ssh/spokey.pem
   become: true
+  handlers:
+    - name: restart_ssh
+      service:
+        name: ssh
+        state: restarted
+        enabled: true
+      when: ansible_distribution == 'Debian'
   tasks:
-    - name: test
-      shell: apt update
+    - name: Enabling ssh-key only root access
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin without-password"
+      notify:
+        - restart_ssh
