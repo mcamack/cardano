@@ -8,6 +8,7 @@
 #############
 locals {
   my_home_ip           = file("${path.module}/lookups/my_home_ip.txt")
+  private_key_path     = file("${path.module}/lookups/private_key_path.txt")
   relay_instance_type  = "t3a.small"
   ami_region1_ubuntu20 = "ami-07dd19a7900a1f049"
   ami_region2_ubuntu20 = "ami-07fbdcfe29326c4fb"
@@ -1966,7 +1967,7 @@ resource "local_file" "hosts_cfg" {
   filename = "./ansible/inventory/hosts.cfg"
 
   provisioner "local-exec" {
-    command = "ansible-playbook ansible/push_ssh_key_to_bastion.yaml -i ansible/inventory/hosts.cfg"
+    command = "ansible-playbook ansible/push_ssh_key_to_bastion.yaml --extra-vars \"private_key_path=${local.private_key_path}\" -i ansible/inventory/hosts.cfg"
   }
 
   depends_on = [aws_eip.bastion, aws_instance.bastion, aws_instance.monitoring, aws_instance.relay1, aws_instance.relay2, aws_instance.relay3]

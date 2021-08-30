@@ -20,15 +20,14 @@
   remote_user: ubuntu
   gather_facts: false
   vars:
-    ssh_key: "~/.ssh/spokey.pem"
-    ansible_ssh_private_key_file: ~/.ssh/spokey.pem
+    ansible_ssh_private_key_file: "{{ private_key_path }}"
+  become: true
   handlers:
     - name: restart_ssh
       service:
         name: ssh
         state: restarted
         enabled: true
-      when: ansible_distribution == 'Debian'
   tasks:
     - name: Enabling ssh-key only root access
       lineinfile:
@@ -39,28 +38,39 @@
         - restart_ssh
     - name: Copy SSH key to Bastion
       copy:
-        src: "{{ ssh_key }}"
+        src: "{{ ansible_ssh_private_key_file }}"
         dest: /home/ubuntu/.ssh/
         owner: ubuntu
         group: ubuntu
         mode: 0400
-    - name: For each private node, scan for its ssh public key
+    - name: For each private relay node, scan for its ssh public key
       shell: "ssh-keyscan {{ item }}"
       register: ssh_known_host_relay_results
       ignore_errors: yes
       with_items: "{{ groups['relays'] }}"
-    - name: Add/update the private node public keys in the Bastion's '{{ ssh_known_hosts_file }}'
+    - name: Add/update the private relay node public keys in the Bastion's '{{ ssh_known_hosts_file }}'
       known_hosts:
         name: "{{ item.item }}"
         key: "{{ item.stdout }}"
         path: "/home/ubuntu/.ssh/known_hosts"
       with_items: "{{ ssh_known_host_relay_results.results }}"
+    - name: For each private monitoring node, scan for its ssh public key
+      shell: "ssh-keyscan {{ item }}"
+      register: ssh_known_host_monitoring_results
+      ignore_errors: yes
+      with_items: "{{ groups['monitoring'] }}"
+    - name: Add/update the private monitoring node public keys in the Bastion's '{{ ssh_known_hosts_file }}'
+      known_hosts:
+        name: "{{ item.item }}"
+        key: "{{ item.stdout }}"
+        path: "/home/ubuntu/.ssh/known_hosts"
+      with_items: "{{ ssh_known_host_monitoring_results.results }}"
 
 - hosts: relays
   remote_user: ubuntu
   gather_facts: false
   vars:
-    ansible_ssh_private_key_file: ~/.ssh/spokey.pem
+    ansible_ssh_private_key_file: "{{ private_key_path }}"
   become: true
   handlers:
     - name: restart_ssh
@@ -68,7 +78,6 @@
         name: ssh
         state: restarted
         enabled: true
-      when: ansible_distribution == 'Debian'
   tasks:
     - name: Enabling ssh-key only root access
       lineinfile:
