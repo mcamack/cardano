@@ -5,7 +5,7 @@ The SPO directory contains all the terraform, ansible, and scripts required to s
 * Creates a bastion server and sets up access to the other nodes
 * Provisions a monitoring server with Prometheus to gather metrics from all the nodes
 
-![Architecture](SPO/docs/architecture.png)
+![Architecture](SPO/images/architecture.png)
 
 
 ## Setup
